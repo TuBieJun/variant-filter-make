@@ -1,0 +1,108 @@
+configfile: "config/config.yaml"
+
+OUTPUT_DIR = config.get("output_dir", "results")
+TRAIN_SAMPLES = [entry["sample_id"] for entry in config["training_sets"]]
+TEST_SAMPLES = [entry["sample_id"] for entry in config["test_sets"]]
+MODELS = [entry["name"] for entry in config["models"]]
+
+
+def get_sample(sample_list, sample_id):
+    for entry in sample_list:
+        if entry["sample_id"] == sample_id:
+            return entry
+    raise ValueError(f"Sample {sample_id} not found in config")
+
+rule all:
+    input:
+        expand(OUTPUT_DIR + "/models/{model}.pkl", model=MODELS),
+        expand(OUTPUT_DIR + "/predictions/{sample}.{model}.filtered.vcf.gz", sample=TEST_SAMPLES, model=MODELS),
+        expand(OUTPUT_DIR + "/benchmark/{sample}.{model}.summary.csv", sample=TEST_SAMPLES, model=MODELS),
+        OUTPUT_DIR + "/plots/benchmark_summary.png"
+
+rule extract_training_features:
+    input:
+        vcf=lambda wildcards: get_sample(config["training_sets"], wildcards.sample)["vcf"],
+        bed=lambda wildcards: get_sample(config["training_sets"], wildcards.sample)["bed"]
+    output:
+        features=OUTPUT_DIR + "/features/{sample}.train.tsv"
+    params:
+        sample=lambda wildcards: wildcards.sample,
+        info_tags=config["info_tags"],
+        truth_vcf=lambda wildcards: get_sample(config["training_sets"], wildcards.sample).get("truth_vcf", "")
+    conda:
+        "envs/training.yaml"
+    script:
+        "scripts/extract_features.py"
+
+rule extract_test_features:
+    input:
+        vcf=lambda wildcards: get_sample(config["test_sets"], wildcards.sample)["vcf"],
+        bed=lambda wildcards: get_sample(config["test_sets"], wildcards.sample)["bed"]
+    output:
+        features=OUTPUT_DIR + "/features/{sample}.test.tsv"
+    params:
+        sample=lambda wildcards: wildcards.sample,
+        info_tags=config["info_tags"]
+    conda:
+        "envs/training.yaml"
+    script:
+        "scripts/extract_features.py"
+
+rule train_model:
+    input:
+        features=expand(OUTPUT_DIR + "/features/{sample}.train.tsv", sample=TRAIN_SAMPLES)
+    output:
+        model=OUTPUT_DIR + "/models/{model}.pkl"
+    params:
+        models=config["models"],
+        info_tags=config["info_tags"]
+    conda:
+        "envs/training.yaml"
+    script:
+        "scripts/train_model.py"
+
+rule apply_model:
+    input:
+        vcf=lambda wildcards: get_sample(config["test_sets"], wildcards.sample)["vcf"],
+        bed=lambda wildcards: get_sample(config["test_sets"], wildcards.sample)["bed"],
+        model=OUTPUT_DIR + "/models/{model}.pkl"
+    output:
+        scored=OUTPUT_DIR + "/predictions/{sample}.{model}.scored.vcf.gz",
+        filtered=OUTPUT_DIR + "/predictions/{sample}.{model}.filtered.vcf.gz"
+    params:
+        model_name=lambda wildcards: wildcards.model,
+        info_tags=config["info_tags"],
+        thresholds=config.get("thresholds", {}),
+        filter_name=config.get("filter_name", "ML_FILTER"),
+        threshold=lambda wildcards: float(config.get("thresholds", {}).get(wildcards.model, 0.5))
+    conda:
+        "envs/training.yaml"
+    script:
+        "scripts/apply_model.py"
+
+rule benchmark_variants:
+    input:
+        truth=lambda wildcards: get_sample(config["test_sets"], wildcards.sample)["truth_vcf"],
+        query=OUTPUT_DIR + "/predictions/{sample}.{model}.filtered.vcf.gz",
+        truth_regions=lambda wildcards: get_sample(config["test_sets"], wildcards.sample)["bed"],
+        genome=config["reference_genome"],
+        genome_index=config["reference_genome"] + ".fai"
+    output:
+        multiext(OUTPUT_DIR + "/benchmark/{sample}.{model}", ".runinfo.json", ".vcf.gz", ".summary.csv", ".extended.csv", ".metrics.json.gz", ".roc.all.csv.gz", ".roc.Locations.INDEL.csv.gz", ".roc.Locations.INDEL.PASS.csv.gz", ".roc.Locations.SNP.csv.gz", ".roc.tsv")
+    params:
+        prefix=lambda wildcards, input, output: output[0].replace(".runinfo.json", "")
+    threads: 4
+    wrapper:
+        "v7.0.0/bio/hap.py/hap.py"
+
+rule plot_benchmark:
+    input:
+        summary=expand(OUTPUT_DIR + "/benchmark/{sample}.{model}.summary.csv", sample=TEST_SAMPLES, model=MODELS)
+    output:
+        OUTPUT_DIR + "/plots/benchmark_summary.png"
+    params:
+        metrics=config.get("plot_metrics", ["precision", "recall", "f1"])
+    conda:
+        "envs/training.yaml"
+    script:
+        "scripts/plot_results.py"
