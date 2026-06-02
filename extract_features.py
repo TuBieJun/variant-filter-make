@@ -17,24 +17,28 @@ def parse_args():
     parser.add_argument("bed_file", help="BED file defining regions of interest")
     parser.add_argument("prefix", help="Output prefix for intersection directory and matrices")
     parser.add_argument(
+        "-s",
         "--sample-id",
         default=None,
         help="Optional sample identifier (default: basename of PREFIX)",
     )
     parser.add_argument(
+        "-f",
         "--vcf-filter-flag",
         default=".,PASS",
-        help="Filter flag passed to bcftools isec -f option (default: .,PASS)",
+        help="Filter flag passed to bcftools isec -f option (default: .,.PASS)",
     )
     parser.add_argument(
+        "-q",
         "--info-flags-snp",
         default="QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR",
-        help="Comma-separated INFO fields for SNPs, default: QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR",
+        help="Comma-separated INFO fields for SNPs (default: QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR)",
     )
     parser.add_argument(
+        "-i",
         "--info-flags-indel",
         default="QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR",
-        help="Comma-separated INFO fields for INDELs, default: QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR",
+        help="Comma-separated INFO fields for INDELs (default: QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR)",
     )
     return parser.parse_args()
 

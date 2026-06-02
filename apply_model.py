@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import argparse
-import sys
 import pickle
 import pandas as pd
-import numpy as np
 import pysam
 
 
