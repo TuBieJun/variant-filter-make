@@ -1,4 +1,4 @@
-# Find Variant Filter
+# Variant Filter Make
 
 This repository is a Snakemake workflow for training machine learning models on VCF INFO-tag features, applying variant filtering models, and benchmarking filtered calls with `hap.py`.
 
