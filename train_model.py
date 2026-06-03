@@ -22,8 +22,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train an ML model on full VCF feature matrices.")
     parser.add_argument("--input", "-i", required=True, nargs="+", help="Path to one or more feature_matrix.tsv files.")
     parser.add_argument("--output-model", "-o", default="trained_model.pkl", help="Path to save the trained model (.pkl).")
-    parser.add_argument("--info-flags", "-f", nargs="+", default=None, 
-                        help="Subsets of INFO flags to use as features. If not set, uses all available INFO columns.")
+    parser.add_argument("--info-flags", "-f", default=None, help="comma-separated INFO fields to use as features (default: all INFO fields in the input files).")
     parser.add_argument("--model", "-m", default="random_forest", 
                         choices=["random_forest", "logistic_regression", "svm", "mlp"],
                         help="Machine learning model architecture to train.")
@@ -92,7 +91,8 @@ def main():
     args = parse_args()
     
     # 1. Load data from all specified files (No train_test_split, use 100% data for training)
-    X_train, y_train, final_features = load_and_combine_data(args.input, args.info_flags)
+    info_flags = args.info_flags.split(",") if args.info_flags else []
+    X_train, y_train, final_features = load_and_combine_data(args.input, info_flags)
     print(f"Total training examples: {X_train.shape[0]} (Features: {X_train.shape[1]})")
     
     # 2. Fetch configured classifier model

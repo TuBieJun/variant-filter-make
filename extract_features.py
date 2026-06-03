@@ -71,8 +71,8 @@ def build_feature_matrix(prefix, sample_id, info_flags, variant_type, matrix_pat
     query_format = info_fields_to_query(info_flags)
     label = "1"
     matrix_lines = [
-        (f"{sample_id}\t%CHROM\t%POS\t%REF\t%ALT\t{query_format}\t{label}\n", f"{prefix}.isec/0002.vcf.gz"),
-        (f"{sample_id}\t%CHROM\t%POS\t%REF\t%ALT\t{query_format}\t0\n", f"{prefix}.isec/0000.vcf.gz"),
+        (f"{sample_id}\t%CHROM\t%POS\t%REF\t%ALT\t{query_format}\t{label}\n", f"{prefix}.isec/0002.vcf"),
+        (f"{sample_id}\t%CHROM\t%POS\t%REF\t%ALT\t{query_format}\t0\n", f"{prefix}.isec/0000.vcf"),
     ]
 
     for record_format, input_path in matrix_lines:
@@ -101,7 +101,7 @@ def main():
         "bcftools",
         "isec",
         "-O",
-        "z",
+        "v",
         "-f",
         vcf_filter_flag,
         "-R",
