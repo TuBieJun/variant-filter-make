@@ -139,15 +139,16 @@ def main():
         total_processed += 1
         
         # Check if the variant matches the requested type
-        current_type = get_variant_type(record)
+        # current_type = get_variant_type(record)
         
-        if current_type == args.var_type:
+        # if current_type == args.var_type:
+        if args.var_type.upper() in record.alleles_variant_types:
             # Add to queue if it matches the target type (SNP or INDEL)
             batch_records.append(record)
             total_evaluated += 1
         else:
-            # If it's the other type, bypass evaluation and write it immediately
-            vcf_out.write(record)
+            # only deal with the target variant type record.
+            continue
         
         # Once the queue hits the batch size limit, execute batch prediction
         if len(batch_records) >= args.batch_size:
