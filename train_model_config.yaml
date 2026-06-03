@@ -1,0 +1,48 @@
+# =========================================================================
+# Machine Learning Model Hyperparameters Configuration File
+# =========================================================================
+
+# 1. Random Forest Classifier
+# Excellent for handling mixed tabular biological data and resistant to overfitting.
+random_forest:
+  n_estimators: 200        # Number of trees in the forest. More trees increase stability.
+  max_depth: 12            # Maximum depth of the tree. Limits complexity to avoid overfitting.
+  min_samples_split: 5     # Minimum number of samples required to split an internal node.
+  min_samples_leaf: 2      # Minimum number of samples required to be at a leaf node.
+  class_weight: "balanced" # Adjust weights inversely proportional to class frequencies (great for rare variants).
+  random_state: 42         # Ensures reproducible results across multiple runs.
+  n_jobs: -1               # Use all available CPU cores for parallel processing.
+
+# 2. Logistic Regression
+# A fast, baseline linear model. Performs best when features are normalized (handled by pipeline).
+logistic_regression:
+  C: 1.0                   # Inverse of regularization strength; smaller values specify stronger regularization.
+  penalty: "l2"            # Specification of the norm used in the penalization (ridge regression).
+  solver: "lbfgs"          # Algorithm to use in the optimization problem.
+  max_iter: 2000           # Maximum number of iterations taken for the solvers to converge.
+  class_weight: "balanced" # Handles class imbalance natively.
+  random_state: 42
+
+# 3. Support Vector Machine (SVM)
+# Effective in high-dimensional spaces. Note: Can be slow on very large datasets (>50,000 variants).
+svm:
+  C: 1.0                   # Regularization parameter. The strength of the regularization is inversely proportional to C.
+  kernel: "rbf"            # Specifies the kernel type to be used in the algorithm (Radial Basis Function).
+  gamma: "scale"           # Kernel coefficient for 'rbf'. 'scale' uses 1 / (n_features * X.var()).
+  probability: true        # Must be true to enable 'predict_proba' for AUC-ROC calculation later.
+  class_weight: "balanced" # Handles class imbalance.
+  random_state: 42
+
+# 4. Multi-Layer Perceptron (MLP / Neural Network)
+# Deep learning approach for capturing complex, non-linear feature interactions.
+mlp:
+  hidden_layer_sizes: [128, 64, 32] # 3 hidden layers containing 128, 64, and 32 neurons respectively.
+  activation: "relu"                # Activation function for the hidden layer (Rectified Linear Unit).
+  solver: "adam"                    # The solver for weight optimization (stochastic gradient-based optimizer).
+  alpha: 0.0001                     # L2 penalty (regularization term) parameter to avoid overfitting.
+  batch_size: "auto"                # Size of minibatches for stochastic optimizers.
+  learning_rate_init: 0.001         # The initial learning rate used. Controls the step size.
+  max_iter: 1000                    # Maximum number of iterations (epochs).
+  early_stopping: true              # Terminate training when validation score is not improving to save time.
+  validation_fraction: 0.1          # The proportion of training data to set aside as validation set for early stopping.
+  random_state: 42
