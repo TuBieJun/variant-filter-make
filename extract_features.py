@@ -25,8 +25,8 @@ def parse_args():
     parser.add_argument(
         "-f",
         "--vcf-filter-flag",
-        default=".,PASS",
-        help="Filter flag passed to bcftools isec -f option (default: .,.PASS)",
+        default="PASS",
+        help="Filter flag passed to bcftools isec -f option (default: PASS)",
     )
     parser.add_argument(
         "-q",
