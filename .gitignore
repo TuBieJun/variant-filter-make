@@ -219,3 +219,5 @@ __marimo__/
 
 .vscode/
 test_workspace/
+results/
+.snakemake/

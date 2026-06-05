@@ -13,14 +13,14 @@ def parse_args():
         description="Generate SNP and INDEL feature matrices from VCF files using bcftools."
     )
     parser.add_argument("target_vcf", help="Path to the target VCF file (.vcf.gz)")
-    parser.add_argument("ref_vcf", help="Path to the reference VCF file (.vcf.gz)")
+    parser.add_argument("truth_set_vcf", help="Path to the truth set VCF file (.vcf.gz)")
     parser.add_argument("bed_file", help="BED file defining regions of interest")
     parser.add_argument("prefix", help="Output prefix for intersection directory and matrices")
     parser.add_argument(
         "-s",
         "--sample-id",
         default=None,
-        help="Optional sample identifier (default: basename of PREFIX)",
+        help="sample id value will be the first column in the output matrix (default: basename of PREFIX)",
     )
     parser.add_argument(
         "-f",
@@ -111,7 +111,7 @@ def main():
         "-p",
         isec_dir,
         args.target_vcf,
-        args.ref_vcf,
+        args.truth_set_vcf,
     ])
 
     snp_matrix = f"{args.prefix}_snp_feature_matrix.tsv"
