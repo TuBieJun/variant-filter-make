@@ -1,12 +1,19 @@
 SAMPLES = ["NA12878", "NA24694", "NA24385"]
 
+rule all:
+    input:
+        # expand("results/happy/{sample_id}.summary.csv", sample_id=SAMPLES)
+        "results/hap_plot/test_dev.snp.hap.summary.png",
+        "results/hap_plot/test_dev.indel.hap.summary.png"
+
+
 rule extract_features:
     input:
-        train_vcf="/data/users/liteng/my_dev/product/wegene_basic_data_bench/data/NA12878304_T7_phase1_8G/NA12878304_T7_phase1_8G.vcf.gz",
-        train_vcf_index="/data/users/liteng/my_dev/product/wegene_basic_data_bench/data/NA12878304_T7_phase1_8G/NA12878304_T7_phase1_8G.vcf.gz.tbi",
-        train_truth_vcf="/data/public_db/giab/GRCH37/latest/NA12878_benchmark.vcf.gz",
-        train_truth_vcf_index="/data/public_db/giab/GRCH37/latest/NA12878_benchmark.vcf.gz.tbi",
-        train_bed="/data/users/liteng/my_dev/product/wegene_basic_data_bench/beds/itech_mt_NA12878_highconf_v4.2.1.bed"
+        train_vcf="inputs/vcfs/{sample_id}.chr1.train.vcf.gz",
+        train_vcf_index="inputs/vcfs/{sample_id}.chr1.train.vcf.gz.csi",
+        train_truth_vcf="inputs/vcfs/{sample_id}.truth.vcf.gz",
+        train_truth_vcf_index="inputs/vcfs/{sample_id}.truth.vcf.gz.tbi",
+        train_bed="inputs/beds/{sample_id}_train_chr1.bed"
     output:
         snp_matrix="results/features/{sample_id}_snp_feature_matrix.tsv",
         indel_matrix="results/features/{sample_id}_indel_feature_matrix.tsv"
@@ -27,15 +34,143 @@ rule extract_features:
             --info-flags-indel "{params.info_flag_indel}"
         """
 
-# rule train_model:
-#     input:
-#         matrix=expand("results/features/{sample_id}_snp_feature_matrix.tsv", sample_id=SAMPLES),
-#         # indel_matrix=expand("results/features/{sample_id}_indel_feature_matrix.tsv", sample_id=SAMPLES)
-#     output:
-#         model="results/models/{sample_id}_model.pkl"
-#     params:
-#         model_name="mlp"
-#     shell:
-#         """
-#         python train_model.py {input.snp_matrix} {input.indel_matrix} {output.model} --model-name {params.model_name}
-#         """
+rule train_model_snp:
+    input:
+        features_file=expand("results/features/{samples}_snp_feature_matrix.tsv", samples=SAMPLES),
+        train_model_config_file="train_model_config.yaml"
+    params:
+        info_flags="QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR",
+        model="mlp"
+    output:
+        model_file="results/models/test_dev_snp.pkl",
+    shell:
+        """
+        python train_model.py \
+              -i {input.features_file} \
+              -o {output.model_file} \
+              --info-flags {params.info_flags} \
+              -c {input.train_model_config_file} \
+              --model {params.model}
+        """
+
+rule train_model_indel:
+    input:
+        features_file=expand("results/features/{samples}_indel_feature_matrix.tsv", samples=SAMPLES),
+        train_model_config_file="train_model_config.yaml"
+    params:
+        info_flags="QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR",
+        model="mlp"
+    output:
+        model_file="results/models/test_dev_indel.pkl",
+    shell:
+        """
+        python train_model.py \
+              -i {input.features_file} \
+              -o {output.model_file} \
+              --info-flags {params.info_flags} \
+              -c {input.train_model_config_file} \
+              --model {params.model}
+        """
+
+rule apply_model_snp:
+    input:
+        model_file="results/models/test_dev_snp.pkl",
+        test_vcf="inputs/vcfs/{sample_id}.chr2.test.vcf.gz",
+        test_vcf_index="inputs/vcfs/{sample_id}.chr2.test.vcf.gz.csi",
+    params:
+        batch_size=10000,
+        filter_name="ML_SNP_FAIL",
+        var_type="snp"
+    output:
+        "results/apply/{sample_id}.chr2.test.apply.snp.vcf.gz"
+    shell:
+        """
+        python apply_model.py \
+            -i {input.test_vcf} \
+            -m {input.model_file} \
+            -o {output} \
+            -t {params.var_type} \
+            -f {params.filter_name} \
+            -F 
+        """
+
+rule apply_model_indel:
+    input:
+        model_file="results/models/test_dev_indel.pkl",
+        test_vcf="inputs/vcfs/{sample_id}.chr2.test.vcf.gz",
+        test_vcf_index="inputs/vcfs/{sample_id}.chr2.test.vcf.gz.csi",
+    params:
+        batch_size=10000,
+        filter_name="ML_INDEL_FAIL",
+        var_type="indel"
+    output:
+        "results/apply/{sample_id}.chr2.test.apply.indel.vcf.gz"
+    shell:
+        """
+        python apply_model.py \
+            -i {input.test_vcf} \
+            -m {input.model_file} \
+            -o {output} \
+            -t {params.var_type} \
+            -f {params.filter_name} \
+            -F 
+        """
+
+rule merge_snp_indel:
+    input:
+        snp_vcf="results/apply/{sample_id}.chr2.test.apply.snp.vcf.gz",
+        indel_vcf="results/apply/{sample_id}.chr2.test.apply.indel.vcf.gz"
+    output:
+        vcf="results/apply/{sample_id}.chr2.test.apply.vcf.gz",
+        vcf_index="results/apply/{sample_id}.chr2.test.apply.vcf.gz.csi"
+    shell:
+        """
+        bcftools concat -a -O z -W -o {output.vcf} {input.snp_vcf} {input.indel_vcf}
+        """
+
+rule hap_py:
+    input:
+        query_vcf="results/apply/{sample_id}.chr2.test.apply.vcf.gz",
+        query_vcf_index="results/apply/{sample_id}.chr2.test.apply.vcf.gz.csi",
+        truth_vcf="inputs/vcfs/{sample_id}.truth.vcf.gz",
+        truth_vcf_index="inputs/vcfs/{sample_id}.truth.vcf.gz.tbi",
+        confident_bed="inputs/beds/{sample_id}_test_chr2.bed",
+        ref_fasta="/data/public_db/human_reference/b37/human_g1k_v37.fasta",
+        ref_fasta_index="/data/public_db/human_reference/b37/human_g1k_v37.fasta.fai"
+    output:
+        "results/happy/{sample_id}.summary.csv"
+    threads: 8
+    shell:
+        """
+        conda run -n hap.py hap.py --threads {threads} \
+            -r {input.ref_fasta} \
+            -f {input.confident_bed} \
+            -o results/happy/{wildcards.sample_id} \
+            {input.truth_vcf} \
+            {input.query_vcf}
+        """
+
+rule plot_hap:
+    input:
+        hap_summary_files=expand("results/happy/{sample_id}.summary.csv", sample_id=SAMPLES)
+    output:
+        "results/hap_plot/test_dev.snp.hap.summary.png",
+        "results/hap_plot/test_dev.indel.hap.summary.png"
+    params:
+        sample_ids=SAMPLES,
+        tags = ["mlp", "mlp", "mlp"]
+    shell:
+        """
+        python plot_hap.py -i {input.hap_summary_files} \
+              -o results/hap_plot/test_dev.hap.snp.summary.png \
+              -s {params.sample_ids} \
+              -t {params.tags} \
+              --type SNP \
+              --filter PASS
+        python plot_hap.py -i {input.hap_summary_files} \
+              -o results/hap_plot/test_dev.hap.indel.summary.png \
+              -s {params.sample_ids} \
+              -t {params.tags} \
+              --type INDEL \
+              --filter PASS
+        """
