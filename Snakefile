@@ -21,7 +21,7 @@ rule extract_features:
         prefix="results/features/{sample_id}",
         vcf_filter_flag=".,PASS,MLrejected",
         info_flag_snp="QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR",
-        info_flag_indel="QD,FS,MQRankSum,ReadPosRankSum,SOR"
+        info_flag_indel="QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR"
     shell:
         """
         python extract_features.py {input.train_vcf} \
@@ -82,16 +82,18 @@ rule apply_model_snp:
         filter_name="ML_SNP_FAIL",
         var_type="snp"
     output:
-        "results/apply/{sample_id}.chr2.test.apply.snp.vcf.gz"
+        vcf="results/apply/{sample_id}.chr2.test.apply.snp.vcf.gz",
+        vcf_index="results/apply/{sample_id}.chr2.test.apply.snp.vcf.gz.tbi"
     shell:
         """
         python apply_model.py \
             -i {input.test_vcf} \
             -m {input.model_file} \
-            -o {output} \
+            -o {output.vcf} \
             -t {params.var_type} \
             -f {params.filter_name} \
-            -F 
+            -F
+        tabix {output.vcf}
         """
 
 rule apply_model_indel:
@@ -104,16 +106,18 @@ rule apply_model_indel:
         filter_name="ML_INDEL_FAIL",
         var_type="indel"
     output:
-        "results/apply/{sample_id}.chr2.test.apply.indel.vcf.gz"
+        vcf="results/apply/{sample_id}.chr2.test.apply.indel.vcf.gz",
+        vcf_index="results/apply/{sample_id}.chr2.test.apply.indel.vcf.gz.tbi"
     shell:
         """
         python apply_model.py \
             -i {input.test_vcf} \
             -m {input.model_file} \
-            -o {output} \
+            -o {output.vcf} \
             -t {params.var_type} \
             -f {params.filter_name} \
             -F 
+        tabix {output.vcf}
         """
 
 rule merge_snp_indel:
