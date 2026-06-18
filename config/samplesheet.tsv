@@ -1,0 +1,7 @@
+sample_id	purpose	query_vcf	query_vcf_index	truth_vcf	truth_vcf_index	bed
+NA12878	train	inputs/vcfs/NA12878.chr1.train.vcf.gz	inputs/vcfs/NA12878.chr1.train.vcf.gz.csi	inputs/vcfs/NA12878.truth.vcf.gz	inputs/vcfs/NA12878.truth.vcf.gz.tbi	inputs/beds/NA12878_train_chr1.bed
+NA24694	train	inputs/vcfs/NA24694.chr1.train.vcf.gz	inputs/vcfs/NA24694.chr1.train.vcf.gz.csi	inputs/vcfs/NA24694.truth.vcf.gz	inputs/vcfs/NA24694.truth.vcf.gz.tbi	inputs/beds/NA24694_train_chr1.bed
+NA24385	train	inputs/vcfs/NA24385.chr1.train.vcf.gz	inputs/vcfs/NA24385.chr1.train.vcf.gz.csi	inputs/vcfs/NA24385.truth.vcf.gz	inputs/vcfs/NA24385.truth.vcf.gz.tbi	inputs/beds/NA24385_train_chr1.bed
+NA12878	bench	inputs/vcfs/NA12878.chr2.test.vcf.gz	inputs/vcfs/NA12878.chr2.test.vcf.gz.csi	inputs/vcfs/NA12878.truth.vcf.gz	inputs/vcfs/NA12878.truth.vcf.gz.tbi	inputs/beds/NA12878_test_chr2.bed
+NA24694	bench	inputs/vcfs/NA24694.chr2.test.vcf.gz	inputs/vcfs/NA24694.chr2.test.vcf.gz.csi	inputs/vcfs/NA24694.truth.vcf.gz	inputs/vcfs/NA24694.truth.vcf.gz.tbi	inputs/beds/NA24694_test_chr2.bed
+NA24385	bench	inputs/vcfs/NA24385.chr2.test.vcf.gz	inputs/vcfs/NA24385.chr2.test.vcf.gz.csi	inputs/vcfs/NA24385.truth.vcf.gz	inputs/vcfs/NA24385.truth.vcf.gz.tbi	inputs/beds/NA24385_test_chr2.bed

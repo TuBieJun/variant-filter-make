@@ -221,3 +221,5 @@ __marimo__/
 inputs/
 results/
 .snakemake/
+
+prompt.md
