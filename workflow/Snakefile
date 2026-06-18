@@ -3,22 +3,29 @@ import pandas as pd
 
 configfile: "config/config.yaml"
 
-print(config.keys())
+# print(config.keys())
 SAMPLES_INFO = pd.read_csv(config["samplesheet"], sep="\t", dtype={"sample_id": str})
 TRAIN_SAMPLES = SAMPLES_INFO[SAMPLES_INFO["purpose"] == "train"].set_index("sample_id", drop=False).sort_index()
 BENCH_SAMPLES = SAMPLES_INFO[SAMPLES_INFO["purpose"] == "bench"].set_index("sample_id", drop=False).sort_index()
 
 
-print(TRAIN_SAMPLES.loc["NA12878"]["query_vcf"])
+# print(TRAIN_SAMPLES.loc["NA12878"]["query_vcf"])
 
-
+wildcard_constraints:
+    sample_id = "|".join(TRAIN_SAMPLES.index.tolist() + BENCH_SAMPLES.index.tolist())
 
 
 # sys.exit(0)
 rule all:
     input:
-        expand("results/features/{prefix}_{sample_id}_snp_feature_matrix.tsv", sample_id=TRAIN_SAMPLES.index[0], prefix=config["prefix"]),
-        expand("results/features/{prefix}_{sample_id}_indel_feature_matrix.tsv", sample_id=TRAIN_SAMPLES.index[0], prefix=config["prefix"])
+        # expand("results/features/{prefix}_{sample_id}_snp_feature_matrix.tsv", sample_id=TRAIN_SAMPLES.index, prefix=config["prefix"]),
+        # expand("results/features/{prefix}_{sample_id}_indel_feature_matrix.tsv", sample_id=TRAIN_SAMPLES.index, prefix=config["prefix"]),
+        # expand("results/features/{prefix}_{model_name}_{var_type}.pkl", prefix=config["prefix"], model_name=config["train_model"]["model_names"], var_type=["snp", "indel"]),
+        # expand("results/apply/{prefix}_{sample_id}_{model_name}_apply_{var_type}.vcf.gz", prefix=config["prefix"], sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"], var_type=["snp", "indel"]),
+        # expand("results/merge_apply/{prefix}_{sample_id}_{model_name}_apply.vcf.gz", prefix=config["prefix"], sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"]),
+        # expand("results/merge_apply/{prefix}_{sample_id}_{model_name}_apply_happy.summary.csv", prefix=config["prefix"], sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"]),
+        expand("results/merge_apply/{prefix}_{sample_id}_{model_name}_apply_snp_happy_summary.png", prefix=config["prefix"], sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"]),
+        expand("results/merge_apply/{prefix}_{sample_id}_{model_name}_apply_indel_happy_summary.png", prefix=config["prefix"], sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"])
         
 
 rule extract_features:
@@ -48,147 +55,120 @@ rule extract_features:
             --info-flags-indel "{params.info_flag_indel}"
         """
 
-# rule train_model_snp:
-#     input:
-#         features_file=expand("results/features/{samples}_snp_feature_matrix.tsv", samples=SAMPLES),
-#         train_model_config_file="train_model_config.yaml"
-#     params:
-#         info_flags="QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR",
-#         model="mlp"
-#     output:
-#         model_file="results/models/test_dev_snp.pkl",
-#     shell:
-#         """
-#         python workflow/scripts/train_model.py \
-#               -i {input.features_file} \
-#               -o {output.model_file} \
-#               --info-flags {params.info_flags} \
-#               -c {input.train_model_config_file} \
-#               --model {params.model}
-#         """
+rule train_model:
+    input:
+        # features_file=expand("results/features/{samples}_{var_type}_feature_matrix.tsv", samples=TRAIN_SAMPLES.index),
+        features_file = lambda wc: expand(
+            "results/features/{prefix}_{samples}_{var_type}_feature_matrix.tsv", 
+            prefix=config["prefix"], 
+            samples=TRAIN_SAMPLES.index, 
+            var_type=wc.var_type
+        ),
+        train_model_config_file=config["train_model"]["config_file"]
+    params:
+        info_flags=lambda wc: config["train_model"][f"info_flags_{wc.var_type}"],
+        model=config["train_model"]["model_names"]
+    output:
+        model_file=f"results/features/{config['prefix']}"+"_{model_name}_{var_type}.pkl",
+    shell:
+        """
+        python workflow/scripts/train_model.py \
+              -i {input.features_file} \
+              -o {output.model_file} \
+              --info-flags {params.info_flags} \
+              -c {input.train_model_config_file} \
+              --model {params.model}
+        """
 
-# rule train_model_indel:
-#     input:
-#         features_file=expand("results/features/{samples}_indel_feature_matrix.tsv", samples=SAMPLES),
-#         train_model_config_file="train_model_config.yaml"
-#     params:
-#         info_flags="QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR",
-#         model="mlp"
-#     output:
-#         model_file="results/models/test_dev_indel.pkl",
-#     shell:
-#         """
-#         python workflow/scripts/train_model.py \
-#               -i {input.features_file} \
-#               -o {output.model_file} \
-#               --info-flags {params.info_flags} \
-#               -c {input.train_model_config_file} \
-#               --model {params.model}
-#         """
+rule apply_model:
+    input:
+        model_file=f"results/features/{config['prefix']}"+"_{model_name}_{var_type}.pkl",
+        test_vcf=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["query_vcf"],
+        test_vcf_index=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["query_vcf_index"],
+    params:
+        batch_size=config["apply_model"]["batch_size"],
+        filter_name=config["apply_model"]["filter_name_prefix"],
+        var_type="{var_type}",
+        overwrite_filter="-F" if config["apply_model"]["overwrite_filter"] else ""
+    output:
+        vcf=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_{var_type}.vcf.gz",
+        vcf_index=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_{var_type}.vcf.gz.csi"
+    shell:
+        """
+        python workflow/scripts/apply_model.py \
+            -i {input.test_vcf} \
+            -m {input.model_file} \
+            -o {output.vcf} \
+            -t {params.var_type} \
+            -f {params.filter_name}_{params.var_type}_FAIL \
+            {params.overwrite_filter}
+        tabix {output.vcf}
+        """
 
-# rule apply_model_snp:
-#     input:
-#         model_file="results/models/test_dev_snp.pkl",
-#         test_vcf="inputs/vcfs/{sample_id}.chr2.test.vcf.gz",
-#         test_vcf_index="inputs/vcfs/{sample_id}.chr2.test.vcf.gz.csi",
-#     params:
-#         batch_size=10000,
-#         filter_name="ML_SNP_FAIL",
-#         var_type="snp"
-#     output:
-#         vcf="results/apply/{sample_id}.chr2.test.apply.snp.vcf.gz",
-#         vcf_index="results/apply/{sample_id}.chr2.test.apply.snp.vcf.gz.tbi"
-#     shell:
-#         """
-#         python workflow/scripts/apply_model.py \
-#             -i {input.test_vcf} \
-#             -m {input.model_file} \
-#             -o {output.vcf} \
-#             -t {params.var_type} \
-#             -f {params.filter_name} \
-#             -F
-#         tabix {output.vcf}
-#         """
+rule merge_snp_indel:
+    input:
+        snp_vcf=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_snp.vcf.gz",
+        snp_v_index=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_snp.vcf.gz.csi",
+        indel_vcf=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_indel.vcf.gz",
+        indel_v_index=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_indel.vcf.gz.csi"
+    output:
+        vcf=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz",
+        vcf_index=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz.csi"
+    shell:
+        """
+        bcftools concat -a -O z -W -o {output.vcf} {input.snp_vcf} {input.indel_vcf}
+        """
 
-# rule apply_model_indel:
-#     input:
-#         model_file="results/models/test_dev_indel.pkl",
-#         test_vcf="inputs/vcfs/{sample_id}.chr2.test.vcf.gz",
-#         test_vcf_index="inputs/vcfs/{sample_id}.chr2.test.vcf.gz.csi",
-#     params:
-#         batch_size=10000,
-#         filter_name="ML_INDEL_FAIL",
-#         var_type="indel"
-#     output:
-#         vcf="results/apply/{sample_id}.chr2.test.apply.indel.vcf.gz",
-#         vcf_index="results/apply/{sample_id}.chr2.test.apply.indel.vcf.gz.tbi"
-#     shell:
-#         """
-#         python workflow/scripts/apply_model.py \
-#             -i {input.test_vcf} \
-#             -m {input.model_file} \
-#             -o {output.vcf} \
-#             -t {params.var_type} \
-#             -f {params.filter_name} \
-#             -F 
-#         tabix {output.vcf}
-#         """
+rule hap_py:
+    input:
+        # query_vcf="results/merge_apply/{sample_id}.chr2.test.apply.vcf.gz",
+        query_vcf=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz",
+        query_vcf_index=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz.csi",
+        truth_vcf=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["truth_vcf"],
+        truth_vcf_index=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["truth_vcf_index"],
+        confident_bed=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["bed"],
+        ref_fasta=config["hap_py"]["ref_fasta"],
+        ref_fasta_index=config["hap_py"]["ref_fasta_index"]
+    output:
+        # "results/happy/{sample_id}.summary.csv"
+        f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_happy.summary.csv"
+    threads: 8
+    shell:
+        """
+        conda run -n hap.py hap.py --threads {threads} \
+            -r {input.ref_fasta} \
+            -f {input.confident_bed} \
+            -o results/happy/{config[prefix]}_{wildcards.sample_id}_{wildcards.model_name}_apply_happy \
+            {input.truth_vcf} \
+            {input.query_vcf}
+        """
 
-# rule merge_snp_indel:
-#     input:
-#         snp_vcf="results/apply/{sample_id}.chr2.test.apply.snp.vcf.gz",
-#         indel_vcf="results/apply/{sample_id}.chr2.test.apply.indel.vcf.gz"
-#     output:
-#         vcf="results/apply/{sample_id}.chr2.test.apply.vcf.gz",
-#         vcf_index="results/apply/{sample_id}.chr2.test.apply.vcf.gz.csi"
-#     shell:
-#         """
-#         bcftools concat -a -O z -W -o {output.vcf} {input.snp_vcf} {input.indel_vcf}
-#         """
-
-# rule hap_py:
-#     input:
-#         query_vcf="results/apply/{sample_id}.chr2.test.apply.vcf.gz",
-#         query_vcf_index="results/apply/{sample_id}.chr2.test.apply.vcf.gz.csi",
-#         truth_vcf="inputs/vcfs/{sample_id}.truth.vcf.gz",
-#         truth_vcf_index="inputs/vcfs/{sample_id}.truth.vcf.gz.tbi",
-#         confident_bed="inputs/beds/{sample_id}_test_chr2.bed",
-#         ref_fasta="/data/public_db/human_reference/b37/human_g1k_v37.fasta",
-#         ref_fasta_index="/data/public_db/human_reference/b37/human_g1k_v37.fasta.fai"
-#     output:
-#         "results/happy/{sample_id}.summary.csv"
-#     threads: 8
-#     shell:
-#         """
-#         conda run -n hap.py hap.py --threads {threads} \
-#             -r {input.ref_fasta} \
-#             -f {input.confident_bed} \
-#             -o results/happy/{wildcards.sample_id} \
-#             {input.truth_vcf} \
-#             {input.query_vcf}
-#         """
-
-# rule plot_hap:
-#     input:
-#         hap_summary_files=expand("results/happy/{sample_id}.summary.csv", sample_id=SAMPLES)
-#     output:
-#         "results/hap_plot/test_dev.snp.hap.summary.png",
-#         "results/hap_plot/test_dev.indel.hap.summary.png"
-#     params:
-#         sample_ids=SAMPLES,
-#         tags = ["mlp", "mlp", "mlp"]
-#     shell:
-#         """
-#         python workflow/scripts/plot_hap.py -i {input.hap_summary_files} \
-#               -o results/hap_plot/test_dev.snp.hap.summary.png \
-#               -s {params.sample_ids} \
-#               -t {params.tags} \
-#               --type SNP \
-#               --filter PASS
-#         python workflow/scripts/plot_hap.py -i {input.hap_summary_files} \
-#               -o results/hap_plot/test_dev.indel.hap.summary.png \
-#               -s {params.sample_ids} \
-#               -t {params.tags} \
-#               --type INDEL \
-#               --filter PASS
-#         """
+rule plot_hap:
+    input:
+        hap_summary_files = expand("results/merge_apply/{prefix}_{sample_id}_{model_name}_apply_happy.summary.csv", 
+                                    prefix=config["prefix"], 
+                                    sample_id=BENCH_SAMPLES.index, 
+                                    model_name=config["train_model"]["model_names"])
+    output:
+        # "results/hap_plot/test_dev.snp.hap.summary.png",
+        # "results/hap_plot/test_dev.indel.hap.summary.png"
+        snp_png=f"results/merge_apply/{config['prefix']}"+"_{model_name}_apply_snp_happy_summary.png",
+        indel_png=f"results/merge_apply/{config['prefix']}"+"_{model_name}_apply_indel_happy_summary.png"
+    params:
+        sample_ids=BENCH_SAMPLES.index,
+        tags = config["train_model"]["model_names"]
+    shell:
+        """
+        python workflow/scripts/plot_hap.py -i {input.hap_summary_files} \
+              -o {output.snp_png} \
+              -s {params.sample_ids} \
+              -t {params.tags} \
+              --type SNP \
+              --filter PASS
+        python workflow/scripts/plot_hap.py -i {input.hap_summary_files} \
+              -o {output.indel_png} \
+              -s {params.sample_ids} \
+              -t {params.tags} \
+              --type INDEL \
+              --filter PASS
+        """
