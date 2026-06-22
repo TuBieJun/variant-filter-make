@@ -74,7 +74,7 @@ rule train_model:
               -c {input.train_model_config_file} \
               --model {params.model}
         """
-
+    
 rule apply_model:
     input:
         model_file=f"results/models/{config['prefix']}"+"_{model_name}_{var_type}.pkl",
@@ -116,27 +116,20 @@ rule merge_snp_indel:
 
 rule hap_py:
     input:
-        # query_vcf="results/merge_apply/{sample_id}.chr2.test.apply.vcf.gz",
-        query_vcf=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz",
-        query_vcf_index=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz.csi",
-        truth_vcf=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["truth_vcf"],
-        truth_vcf_index=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["truth_vcf_index"],
-        confident_bed=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["bed"],
-        ref_fasta=config["hap_py"]["ref_fasta"],
-        ref_fasta_index=config["hap_py"]["ref_fasta_index"]
+        truth=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["truth_vcf"],
+        truth_index=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["truth_vcf_index"],
+        query=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["query_vcf"],
+        query_index=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["query_vcf_index"],
+        truth_regions=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["bed"],
+        genome=config["hap_py"]["ref_fasta"],
+        genome_index=config["hap_py"]["ref_fasta_index"]
     output:
-        # "results/happy/{sample_id}.summary.csv"
         f"results/happy/{config['prefix']}"+"_{sample_id}_{model_name}_apply_happy.summary.csv"
-    threads: 8
-    shell:
-        """
-        conda run -n hap.py hap.py --threads {threads} \
-            -r {input.ref_fasta} \
-            -f {input.confident_bed} \
-            -o results/happy/{config[prefix]}_{wildcards.sample_id}_{wildcards.model_name}_apply_happy \
-            {input.truth_vcf} \
-            {input.query_vcf}
-        """
+    params:
+        prefix=f"results/happy/{config['prefix']}"+"_{sample_id}_{model_name}_apply_happy"
+    threads: 4
+    log: f"results/happy/{config['prefix']}"+"_{sample_id}_{model_name}_apply_happy.log"
+    wrapper: "v7.0.0/bio/hap.py/hap.py"
 
 rule plot_hap:
     input:
@@ -150,8 +143,9 @@ rule plot_hap:
         snp_png=f"results/happy_plot/{config['prefix']}_apply_snp_happy_summary.png",
         indel_png=f"results/happy_plot/{config['prefix']}_apply_indel_happy_summary.png"
     params:
-        sample_ids=BENCH_SAMPLES.index.tolist(),
-        tags = config["train_model"]["model_names"]
+        sample_ids=[s for s in BENCH_SAMPLES.index for _ in range(len(config["train_model"]["model_names"]))],
+        # tags = expand("{model_name}", sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"])
+        tags = [ m for _ in BENCH_SAMPLES.index for m in config["train_model"]["model_names"]]
     shell:
         """
         python workflow/scripts/plot_hap.py -i {input.hap_summary_files} \

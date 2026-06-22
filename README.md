@@ -87,12 +87,12 @@ Edit `config/config.yaml` to set:
 ### 3. Run the Workflow
 
 ```bash
-snakemake --cores all
+snakemake --cores your_cpu_number --use-conda
 ```
 
 For a dry run:
 ```bash
-snakemake --cores all -n
+snakemake -n
 ```
 
 To generate the DAG:
