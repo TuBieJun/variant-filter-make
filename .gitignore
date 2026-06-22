@@ -221,5 +221,6 @@ __marimo__/
 inputs/
 results/
 .snakemake/
+generate_test.sh
 
 prompt.md

@@ -18,14 +18,8 @@ wildcard_constraints:
 # sys.exit(0)
 rule all:
     input:
-        # expand("results/features/{prefix}_{sample_id}_snp_feature_matrix.tsv", sample_id=TRAIN_SAMPLES.index, prefix=config["prefix"]),
-        # expand("results/features/{prefix}_{sample_id}_indel_feature_matrix.tsv", sample_id=TRAIN_SAMPLES.index, prefix=config["prefix"]),
-        # expand("results/features/{prefix}_{model_name}_{var_type}.pkl", prefix=config["prefix"], model_name=config["train_model"]["model_names"], var_type=["snp", "indel"]),
-        # expand("results/apply/{prefix}_{sample_id}_{model_name}_apply_{var_type}.vcf.gz", prefix=config["prefix"], sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"], var_type=["snp", "indel"]),
-        # expand("results/merge_apply/{prefix}_{sample_id}_{model_name}_apply.vcf.gz", prefix=config["prefix"], sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"]),
-        # expand("results/merge_apply/{prefix}_{sample_id}_{model_name}_apply_happy.summary.csv", prefix=config["prefix"], sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"]),
-        expand("results/merge_apply/{prefix}_{sample_id}_{model_name}_apply_snp_happy_summary.png", prefix=config["prefix"], sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"]),
-        expand("results/merge_apply/{prefix}_{sample_id}_{model_name}_apply_indel_happy_summary.png", prefix=config["prefix"], sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"])
+        "results/happy_plot/{prefix}_apply_snp_happy_summary.png".format(prefix=config["prefix"]),
+        "results/happy_plot/{prefix}_apply_indel_happy_summary.png".format(prefix=config["prefix"])
         
 
 rule extract_features:
@@ -67,9 +61,10 @@ rule train_model:
         train_model_config_file=config["train_model"]["config_file"]
     params:
         info_flags=lambda wc: config["train_model"][f"info_flags_{wc.var_type}"],
-        model=config["train_model"]["model_names"]
+        # model=config["train_model"]["model_names"]
+        model="{model_name}"
     output:
-        model_file=f"results/features/{config['prefix']}"+"_{model_name}_{var_type}.pkl",
+        model_file=f"results/models/{config['prefix']}"+"_{model_name}_{var_type}.pkl",
     shell:
         """
         python workflow/scripts/train_model.py \
@@ -82,7 +77,7 @@ rule train_model:
 
 rule apply_model:
     input:
-        model_file=f"results/features/{config['prefix']}"+"_{model_name}_{var_type}.pkl",
+        model_file=f"results/models/{config['prefix']}"+"_{model_name}_{var_type}.pkl",
         test_vcf=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["query_vcf"],
         test_vcf_index=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["query_vcf_index"],
     params:
@@ -92,7 +87,7 @@ rule apply_model:
         overwrite_filter="-F" if config["apply_model"]["overwrite_filter"] else ""
     output:
         vcf=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_{var_type}.vcf.gz",
-        vcf_index=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_{var_type}.vcf.gz.csi"
+        vcf_index=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_{var_type}.vcf.gz.tbi"
     shell:
         """
         python workflow/scripts/apply_model.py \
@@ -108,9 +103,9 @@ rule apply_model:
 rule merge_snp_indel:
     input:
         snp_vcf=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_snp.vcf.gz",
-        snp_v_index=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_snp.vcf.gz.csi",
+        snp_v_index=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_snp.vcf.gz.tbi",
         indel_vcf=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_indel.vcf.gz",
-        indel_v_index=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_indel.vcf.gz.csi"
+        indel_v_index=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_indel.vcf.gz.tbi"
     output:
         vcf=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz",
         vcf_index=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz.csi"
@@ -131,7 +126,7 @@ rule hap_py:
         ref_fasta_index=config["hap_py"]["ref_fasta_index"]
     output:
         # "results/happy/{sample_id}.summary.csv"
-        f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_happy.summary.csv"
+        f"results/happy/{config['prefix']}"+"_{sample_id}_{model_name}_apply_happy.summary.csv"
     threads: 8
     shell:
         """
@@ -145,17 +140,17 @@ rule hap_py:
 
 rule plot_hap:
     input:
-        hap_summary_files = expand("results/merge_apply/{prefix}_{sample_id}_{model_name}_apply_happy.summary.csv", 
+        hap_summary_files = expand("results/happy/{prefix}_{sample_id}_{model_name}_apply_happy.summary.csv", 
                                     prefix=config["prefix"], 
                                     sample_id=BENCH_SAMPLES.index, 
                                     model_name=config["train_model"]["model_names"])
     output:
         # "results/hap_plot/test_dev.snp.hap.summary.png",
         # "results/hap_plot/test_dev.indel.hap.summary.png"
-        snp_png=f"results/merge_apply/{config['prefix']}"+"_{model_name}_apply_snp_happy_summary.png",
-        indel_png=f"results/merge_apply/{config['prefix']}"+"_{model_name}_apply_indel_happy_summary.png"
+        snp_png=f"results/happy_plot/{config['prefix']}_apply_snp_happy_summary.png",
+        indel_png=f"results/happy_plot/{config['prefix']}_apply_indel_happy_summary.png"
     params:
-        sample_ids=BENCH_SAMPLES.index,
+        sample_ids=BENCH_SAMPLES.index.tolist(),
         tags = config["train_model"]["model_names"]
     shell:
         """
