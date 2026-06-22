@@ -118,8 +118,8 @@ rule hap_py:
     input:
         truth=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["truth_vcf"],
         truth_index=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["truth_vcf_index"],
-        query=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["query_vcf"],
-        query_index=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["query_vcf_index"],
+        query=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz",
+        query_index=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz.csi",
         truth_regions=lambda wc:BENCH_SAMPLES.loc[wc.sample_id]["bed"],
         genome=config["hap_py"]["ref_fasta"],
         genome_index=config["hap_py"]["ref_fasta_index"]
