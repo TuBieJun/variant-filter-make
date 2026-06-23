@@ -42,14 +42,7 @@ extract_features → train_model → apply_model → merge_snp_indel → hap_py 
 - [Snakemake](https://snakemake.readthedocs.io/) (>=7.0)
 - Python 3.x with:
   - pandas
-  - scikit-learn
-  - matplotlib
-  - pysam
-- [bcftools](https://samtools.github.io/bcftools/)
-- [tabix](http://www.htslib.org/doc/tabix.html)
-- [hap.py](https://github.com/Illumina/hap.py) (for benchmarking)
-- Reference genome (e.g., human_g1k_v37.fasta)
-
+  
 ## Quick Start
 
 ### 1. Prepare Input Files
@@ -88,16 +81,6 @@ Edit `config/config.yaml` to set:
 
 ```bash
 snakemake --cores your_cpu_number --use-conda
-```
-
-For a dry run:
-```bash
-snakemake -n
-```
-
-To generate the DAG:
-```bash
-snakemake --dag | dot -Tpng > dag.png
 ```
 
 ## Configuration

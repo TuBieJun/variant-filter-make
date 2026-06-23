@@ -3,13 +3,11 @@ import pandas as pd
 
 configfile: "config/config.yaml"
 
-# print(config.keys())
 SAMPLES_INFO = pd.read_csv(config["samplesheet"], sep="\t", dtype={"sample_id": str})
 TRAIN_SAMPLES = SAMPLES_INFO[SAMPLES_INFO["purpose"] == "train"].set_index("sample_id", drop=False).sort_index()
 BENCH_SAMPLES = SAMPLES_INFO[SAMPLES_INFO["purpose"] == "bench"].set_index("sample_id", drop=False).sort_index()
 
 
-# print(TRAIN_SAMPLES.loc["NA12878"]["query_vcf"])
 
 wildcard_constraints:
     sample_id = "|".join(TRAIN_SAMPLES.index.tolist() + BENCH_SAMPLES.index.tolist())
@@ -37,6 +35,8 @@ rule extract_features:
         vcf_filter_flag=config["extract_features"]["vcf_filter_flag"],
         info_flag_snp=config["extract_features"]["info_flags_snp"],
         info_flag_indel=config["extract_features"]["info_flags_indel"]
+    conda:
+        "./envs/common.yaml"
     shell:
         """
         python workflow/scripts/extract_features.py {input.train_vcf} \
@@ -65,6 +65,8 @@ rule train_model:
         model="{model_name}"
     output:
         model_file=f"results/models/{config['prefix']}"+"_{model_name}_{var_type}.pkl",
+    conda:
+        "./envs/common.yaml"
     shell:
         """
         python workflow/scripts/train_model.py \
@@ -88,6 +90,8 @@ rule apply_model:
     output:
         vcf=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_{var_type}.vcf.gz",
         vcf_index=f"results/apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply_{var_type}.vcf.gz.tbi"
+    conda:
+        "./envs/common.yaml"
     shell:
         """
         python workflow/scripts/apply_model.py \
@@ -109,6 +113,8 @@ rule merge_snp_indel:
     output:
         vcf=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz",
         vcf_index=f"results/merge_apply/{config['prefix']}"+"_{sample_id}_{model_name}_apply.vcf.gz.csi"
+    conda:
+        "./envs/common.yaml"
     shell:
         """
         bcftools concat -a -O z -W -o {output.vcf} {input.snp_vcf} {input.indel_vcf}
@@ -146,6 +152,8 @@ rule plot_hap:
         sample_ids=[s for s in BENCH_SAMPLES.index for _ in range(len(config["train_model"]["model_names"]))],
         # tags = expand("{model_name}", sample_id=BENCH_SAMPLES.index, model_name=config["train_model"]["model_names"])
         tags = [ m for _ in BENCH_SAMPLES.index for m in config["train_model"]["model_names"]]
+    conda:
+        "./envs/common.yaml"
     shell:
         """
         python workflow/scripts/plot_hap.py -i {input.hap_summary_files} \
