@@ -1,0 +1,27 @@
+samplesheet: config/samplesheet.tsv
+
+prefix: test_dev
+
+extract_features:
+  vcf_filter_flag: ".,PASS,MLrejected"
+  info_flags_snp: "QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR"
+  info_flags_indel: "QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR"
+
+train_model:
+  model_names:
+    - mlp
+    - svm
+    - random_forest
+  config_file: config/train_model_config.yaml
+  info_flags_snp: "QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR"
+  info_flags_indel: "QD,MQ,FS,MQRankSum,ReadPosRankSum,SOR"
+
+apply_model:
+  batch_size: 10000
+  overwrite_filter: true
+  filter_name_prefix: "ML"
+
+hap_py:
+  ref_fasta: /data/public_db/human_reference/b37/human_g1k_v37.fasta
+  ref_fasta_index: /data/public_db/human_reference/b37/human_g1k_v37.fasta.fai
+  threads: 8

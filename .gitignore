@@ -224,3 +224,5 @@ results/
 generate_test.sh
 
 prompt.md
+
+./config/samplesheet.tsv
