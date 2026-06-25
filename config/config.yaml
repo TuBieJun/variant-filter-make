@@ -25,9 +25,3 @@ hap_py:
   ref_fasta: /data/public_db/human_reference/b37/human_g1k_v37.fasta
   ref_fasta_index: /data/public_db/human_reference/b37/human_g1k_v37.fasta.fai
   threads: 8
-
-plot:
-  type: SNP
-  filter: PASS
-  snp_output: results/hap_plot/test_dev.snp.hap.summary.png
-  indel_output: results/hap_plot/test_dev.indel.hap.summary.png
