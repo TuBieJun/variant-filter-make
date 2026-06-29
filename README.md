@@ -12,8 +12,32 @@ This pipeline implements a supervised learning approach for variant quality filt
 4. **Benchmarking** — Evaluate filtered VCFs against truth sets using hap.py
 5. **Visualization** — Generate summary plots comparing model performance across samples
 
+## Parallelization Strategy
+
+The workflow is designed to maximize parallel execution across multiple dimensions:
+
+**Training Phase:**
+- **By variant type**: SNP and INDEL feature extraction, model training, and model application run in parallel
+- **By model**: All configured models (mlp, svm, random_forest, logistic_regression) train simultaneously for each variant type
+- **By sample**: Feature extraction runs in parallel across all training samples
+
+**Benchmarking Phase:**
+- **By sample**: hap.py evaluation runs in parallel for each benchmark sample
+- **By model**: Each model's predictions are evaluated independently and simultaneously
+
+This design means that with sufficient CPU cores, the workflow can process multiple models × variant types × samples concurrently, significantly reducing total runtime. For example, if you configure 4 models and have 3 benchmark samples, the hap.py stage will run up to 12 jobs in parallel (4 models × 3 samples).
+
+To take advantage of this parallelization, specify an appropriate number of cores when running snakemake:
+
+```bash
+snakemake --cores 16 --use-conda
+```
+
 ## Workflow DAG
 extract_features → train_model → apply_model → merge_snp_indel → hap_py → plot_hap
+![Workflow rulegraph](screenshots/rulegraph.png)
+
+real data workflow dag
 ![Workflow DAG](screenshots/dag.png)
 
 ## Directory Structure
@@ -153,8 +177,8 @@ python workflow/scripts/apply_model.py \
     -i your_new_variants.vcf.gz \
     -m results/models/<prefix>_<model_name>_apply_<snp|indel>.pkl \
     -o filtered_output.vcf.gz \
-    -t snp \
-    -f ML_snp_FAIL \
+    -t <snp|indel> \
+    -f ML \
     -F
 ```
 
