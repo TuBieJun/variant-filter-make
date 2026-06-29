@@ -34,10 +34,12 @@ snakemake --cores 16 --use-conda
 ```
 
 ## Workflow DAG
-extract_features → train_model → apply_model → merge_snp_indel → hap_py → plot_hap
+extract_features → train_model → apply_model → merge_snp_indel → hap_py → plot_hap  
+
 ![Workflow rulegraph](screenshots/rulegraph.png)
 
-real data workflow dag
+real data workflow dag  
+
 ![Workflow DAG](screenshots/dag.png)
 
 ## Directory Structure
